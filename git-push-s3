@@ -1,0 +1,62 @@
+#!/usr/bin/env python
+
+import sys
+import json
+import os
+import boto
+import argparse
+
+class FileUploader(object):
+    def __init__(self, bucketName):
+        self.directoriesToIgnore = ['.git']
+
+        self.bucketName = bucketName
+        self.conn = boto.connect_s3()
+        self.bucket = self.conn.get_bucket(bucketName)
+        self.localFiles = self.getLocalFiles()
+        self.s3Keys = { k.name : k for k in self.bucket.list()}
+
+        for fileName in self.localFiles:
+            if fileName in self.s3Keys:
+                with open(fileName) as fp:
+                    key = self.s3Keys[fileName]
+                    if json.loads(key.etag) != key.compute_md5(fp)[0]:
+                        self.upload(key, fileName)
+            else:
+                key = self.bucket.new_key(fileName)
+                self.upload(key, fileName)
+
+
+    def upload(self, key, fileName):
+        key.set_contents_from_filename(fileName)
+        print fileName
+
+    def shouldIgnore(self, relativePath):
+        for directory in self.directoriesToIgnore:
+            if relativePath.startswith(directory):
+                return True
+
+    def getLocalFiles(self):
+        result = set()
+        for dirpath, _, fileNames in os.walk(os.getcwd()):
+            for fileName in fileNames:
+                fullPath = os.path.join(dirpath, fileName)
+                relativePath = os.path.relpath(fullPath, os.getcwd())
+                if not self.shouldIgnore(relativePath):
+                    result.add(relativePath)
+        return result
+
+
+
+def main(args):
+    if not '.git' in os.listdir(os.getcwd()):
+        print >> sys.stderr, "Must be invoked from project root"
+        return 1
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument('bucket')
+    uploader = FileUploader(parser.parse_args(args).bucket)
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
