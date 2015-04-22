@@ -26,7 +26,3 @@ Installation:
 Ensure you have "boto" installed, and then place git-push-s3 somewhere in your 
 path (eg /usr/local/bin/).
 
-
-
-
-

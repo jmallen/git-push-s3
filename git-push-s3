@@ -13,19 +13,21 @@ class FileUploader(object):
         self.bucketName = bucketName
         self.conn = boto.connect_s3()
         self.bucket = self.conn.get_bucket(bucketName)
-        self.localFiles = self.getLocalFiles()
-        self.s3Keys = { k.name : k for k in self.bucket.list()}
 
-        for fileName in self.localFiles:
-            if fileName in self.s3Keys:
+    def sync(self):
+        localFiles = self.getLocalFiles()
+        s3Keys = { k.name : k for k in self.bucket.list()}
+
+        for fileName in localFiles:
+            if fileName in s3Keys:
                 with open(fileName) as fp:
-                    key = self.s3Keys[fileName]
+                    key = s3Keys[fileName]
                     if json.loads(key.etag) != key.compute_md5(fp)[0]:
                         self.upload(key, fileName)
             else:
                 key = self.bucket.new_key(fileName)
                 self.upload(key, fileName)
-
+        return 0
 
     def upload(self, key, fileName):
         key.set_contents_from_filename(fileName)
@@ -56,6 +58,7 @@ def main(args):
     parser = argparse.ArgumentParser()
     parser.add_argument('bucket')
     uploader = FileUploader(parser.parse_args(args).bucket)
+    return uploader.sync()
 
 
 if __name__ == "__main__":
